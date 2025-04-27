@@ -1,122 +1,356 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:infamous_squircle/infamous_squircle.dart';
+import 'package:twq/next_message.dart';
+import 'package:twq/tappable.dart';
 
-void main() {
+void main() async {
+  await dotenv.load(fileName: 'assets/.env');
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  var loading = false;
+  final messages = <Message>[];
+
+  bool get guessed => messages.any((e) => e.answer == Answer.guessed);
+
+  @override
+  void initState() {
+    super.initState();
+    handleStartGame();
   }
-}
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  void handleStartGame() async {
+    next();
+  }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  void next() async {
+    setState(() => loading = true);
+    try {
+      final x = await nextMessage(messages);
+      setState(() => messages.add(x));
+    } catch (e) {
+      if (kDebugMode) print(e);
+      rethrow;
+    }
+    setState(() => loading = false);
+  }
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  void handleTapAnswer(Answer x) {
+    setState(() => messages.last.answer = x);
+    next();
+  }
 
-  final String title;
+  void handleRestartGame() {
+    setState(() => messages.clear());
+    next();
+  }
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
+  void handleUndo() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      messages.removeLast();
+      messages.last.answer = null;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+    final n = messages.length;
+
+    final actionState = switch ('') {
+      _ when (n == 1) => ActionState.ready,
+      _ when (guessed || n >= 20) => ActionState.complete,
+      _ => ActionState.answering,
+    };
+
+    return MaterialApp(
+      title: 'Mr Sleuthy',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          brightness: Brightness.dark,
+          seedColor: Colors.purple,
+        ),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      home: Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 128,
+          forceMaterialTransparency: true,
+          title: Column(
+            spacing: 4,
+            children: [
+              Circle(diameter: 96, child: Image.asset("assets/icon.jpg")),
+              Text(
+                "Mr Sleuthy",
+                style: GoogleFonts.fredoka(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 28),
+              child: IconButton.filledTonal(
+                onPressed: switch (actionState) {
+                  ActionState.ready => null,
+                  ActionState.answering => handleUndo,
+                  ActionState.complete => handleRestartGame,
+                },
+                icon: Icon(switch (actionState) {
+                  ActionState.ready ||
+                  ActionState.answering => Icons.undo_rounded,
+                  ActionState.complete => Icons.restart_alt_rounded,
+                }),
+              ),
             ),
           ],
         ),
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(8),
+          reverse: true,
+          child: Column(
+            spacing: 8,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final (i, x) in messages.indexed) ...[
+                Container(
+                  constraints: BoxConstraints(minHeight: 48),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  margin: EdgeInsets.only(right: 64),
+                  decoration: BoxDecoration(
+                    color: Style.toColor,
+                    borderRadius: Style.toRadius,
+                  ),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          x.question,
+                          style: GoogleFonts.outfit(fontSize: 16),
+                        ),
+                      ),
+                      Text(
+                        "${i + 1}/20",
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: Style.questionNumberColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (x.answer != null)
+                  Container(
+                    height: 48,
+                    width: 48,
+                    decoration: BoxDecoration(
+                      gradient: x.answer?.gradient,
+                      borderRadius: Style.fromRadius,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      x.answer!.emoji,
+                      style: TextStyle(fontSize: 24),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            height: 128 + 32 + 48,
+            margin: EdgeInsets.all(8),
+            child: switch (actionState) {
+              ActionState.ready => AnswerButton(
+                onTap: loading ? null : () => handleTapAnswer(Answer.ready),
+                answer: Answer.ready,
+              ),
+              ActionState.complete => AnswerButton(
+                onTap: handleRestartGame,
+                answer: Answer.playAgain,
+              ),
+              ActionState.answering => Column(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 8,
+                children: [
+                  Visibility.maintain(
+                    visible: n > 1,
+                    child: AnswerButton(
+                      answer: Answer.guessed,
+                      dense: true,
+                      onTap:
+                          loading || n == 1
+                              ? null
+                              : () => handleTapAnswer(Answer.guessed),
+                    ),
+                  ),
+                  Expanded(
+                    child: Row(
+                      spacing: 8,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final x in [Answer.yes, if (n > 1) Answer.no])
+                          Expanded(
+                            child: AnswerButton(
+                              answer: x,
+                              onTap: loading ? null : () => handleTapAnswer(x),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Visibility.maintain(
+                    visible: n > 1,
+                    child: AnswerButton(
+                      answer: Answer.notSure,
+                      dense: true,
+                      onTap:
+                          loading || n == 1
+                              ? null
+                              : () => handleTapAnswer(Answer.notSure),
+                    ),
+                  ),
+                ],
+              ),
+            },
+          ),
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class AnswerButton extends StatelessWidget {
+  const AnswerButton({
+    super.key,
+    required this.answer,
+    required this.onTap,
+    this.dense = false,
+  });
+
+  final Answer answer;
+  final VoidCallback? onTap;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tappable(
+      onTap: onTap,
+      child: Rectangle(
+        radius: 24,
+        height: 48,
+        gradient: answer.gradient,
+        alignment: Alignment.center,
+        child: Text(
+          "${answer.emoji} ${answer.text}",
+          style: GoogleFonts.fredoka(
+            fontSize: dense ? 24 : 48,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class Style {
+  static final toColor = Color(0xFF30212E);
+
+  static final toRadius = BorderRadius.only(
+    topLeft: Radius.circular(24),
+    topRight: Radius.circular(24),
+    bottomLeft: Radius.circular(0),
+    bottomRight: Radius.circular(24),
+  );
+
+  static final fromRadius = BorderRadius.only(
+    topLeft: Radius.circular(24),
+    topRight: Radius.circular(24),
+    bottomLeft: Radius.circular(24),
+    bottomRight: Radius.circular(0),
+  );
+
+  static final questionNumberColor = Color(0xFF6D576A);
+}
+
+class Message {
+  final String question;
+  Answer? answer;
+
+  Message(this.question, this.answer);
+}
+
+enum ActionState { ready, answering, complete }
+
+enum Answer {
+  ready(
+    LinearGradient(
+      colors: [
+        Color.fromARGB(255, 3, 140, 194),
+        Color.fromARGB(255, 2, 108, 189),
+      ],
+    ),
+    "👆",
+    "I'm ready!",
+  ),
+  guessed(
+    LinearGradient(
+      colors: [
+        Color.fromARGB(255, 194, 3, 175),
+        Color.fromARGB(255, 189, 2, 158),
+      ],
+    ),
+    "😱",
+    "You guessed it!",
+  ),
+  yes(
+    LinearGradient(colors: [Color(0xFF03C27C), Color(0xFF02BD60)]),
+    "👍",
+    "Yes",
+  ),
+  no(
+    LinearGradient(colors: [Color(0xFFFF6C23), Color(0xFFDB4900)]),
+    "👎",
+    "No",
+  ),
+  playAgain(
+    LinearGradient(
+      colors: [
+        Color.fromARGB(255, 142, 36, 170),
+        Color.fromARGB(255, 114, 17, 141),
+      ],
+    ),
+    "🔄",
+    "Play again",
+  ),
+  notSure(
+    LinearGradient(
+      colors: [
+        Color.fromARGB(255, 54, 99, 248),
+        Color.fromARGB(255, 133, 32, 210),
+      ],
+    ),
+    "🤷‍♂️",
+    "Not sure",
+  );
+
+  final LinearGradient gradient;
+  final String emoji;
+  final String text;
+
+  const Answer(this.gradient, this.emoji, this.text);
 }
