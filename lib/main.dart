@@ -67,9 +67,10 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     final n = messages.length;
 
-    final actionState = switch ('') {
-      _ when (n == 1) => ActionState.ready,
-      _ when (guessed || n >= 20) => ActionState.complete,
+    // https://x.com/luke_pighetti/status/1916574417540329794
+    final actionState = switch (n) {
+      1 => ActionState.ready,
+      >= 20 || _ when guessed => ActionState.complete,
       _ => ActionState.answering,
     };
 
@@ -131,7 +132,7 @@ class _MyAppState extends State<MyApp> {
                   margin: EdgeInsets.only(right: 64),
                   decoration: BoxDecoration(
                     color: Style.toColor,
-                    borderRadius: Style.toRadius,
+                    borderRadius: Style.questionRadius,
                   ),
                   child: Row(
                     spacing: 8,
@@ -158,7 +159,7 @@ class _MyAppState extends State<MyApp> {
                     width: 48,
                     decoration: BoxDecoration(
                       gradient: x.answer?.gradient,
-                      borderRadius: Style.fromRadius,
+                      borderRadius: Style.answerRadius,
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -172,7 +173,7 @@ class _MyAppState extends State<MyApp> {
         ),
         bottomNavigationBar: SafeArea(
           child: Container(
-            height: 128 + 32 + 48,
+            height: 208, // hand tailored
             margin: EdgeInsets.all(8),
             child: switch (actionState) {
               ActionState.ready => AnswerButton(
@@ -234,50 +235,17 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class AnswerButton extends StatelessWidget {
-  const AnswerButton({
-    super.key,
-    required this.answer,
-    required this.onTap,
-    this.dense = false,
-  });
-
-  final Answer answer;
-  final VoidCallback? onTap;
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tappable(
-      onTap: onTap,
-      child: Rectangle(
-        radius: 24,
-        height: 48,
-        gradient: answer.gradient,
-        alignment: Alignment.center,
-        child: Text(
-          "${answer.emoji} ${answer.text}",
-          style: GoogleFonts.fredoka(
-            fontSize: dense ? 24 : 48,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class Style {
   static final toColor = Color(0xFF30212E);
 
-  static final toRadius = BorderRadius.only(
+  static final questionRadius = BorderRadius.only(
     topLeft: Radius.circular(24),
     topRight: Radius.circular(24),
     bottomLeft: Radius.circular(0),
     bottomRight: Radius.circular(24),
   );
 
-  static final fromRadius = BorderRadius.only(
+  static final answerRadius = BorderRadius.only(
     topLeft: Radius.circular(24),
     topRight: Radius.circular(24),
     bottomLeft: Radius.circular(24),
@@ -353,4 +321,37 @@ enum Answer {
   final String text;
 
   const Answer(this.gradient, this.emoji, this.text);
+}
+
+class AnswerButton extends StatelessWidget {
+  const AnswerButton({
+    super.key,
+    required this.answer,
+    required this.onTap,
+    this.dense = false,
+  });
+
+  final Answer answer;
+  final VoidCallback? onTap;
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tappable(
+      onTap: onTap,
+      child: Rectangle(
+        radius: 24,
+        height: 48,
+        gradient: answer.gradient,
+        alignment: Alignment.center,
+        child: Text(
+          "${answer.emoji} ${answer.text}",
+          style: GoogleFonts.fredoka(
+            fontSize: dense ? 24 : 48,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
 }
